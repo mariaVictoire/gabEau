@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Couleurs du Gabon — vert, jaune, bleu */
+  --color-gabon-green: #008751;
+  --color-gabon-green-dark: #006b40;
+  --color-gabon-green-light: #e6f5ef;
+  --color-gabon-yellow: #fcd116;
+  --color-gabon-yellow-dark: #e5bc00;
+  --color-gabon-yellow-light: #fef9e7;
+  --color-gabon-blue: #006bb5;
+  --color-gabon-blue-dark: #005a96;
+  --color-gabon-blue-light: #e8f2fa;
+
+  --color-brand-50: #e6f5ef;
+  --color-brand-100: #ccebd9;
+  --color-brand-500: #008751;
+  --color-brand-600: #006b40;
+  --color-brand-700: #005533;
+  --color-brand-800: #003d25;
+  --color-water-400: #3a75c4;
+  --color-water-500: #006bb5;
+  --font-sans: var(--font-jakarta);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  background-color: #f8fafc;
+  overflow-x: hidden;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-x {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Bande tricolore Gabon */
+.gabon-tricolor {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    #008751 0%,
+    #008751 33.33%,
+    #fcd116 33.33%,
+    #fcd116 66.66%,
+    #006bb5 66.66%,
+    #006bb5 100%
+  );
+}
+
+.bg-gabon-hero {
+  background: linear-gradient(
+    145deg,
+    #008751 0%,
+    #007a5e 40%,
+    #006bb5 100%
+  );
+}
+
+.bg-water-pattern {
+  background-color: #f0faf5;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(0, 135, 81, 0.07) 0, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(0, 107, 181, 0.06) 0, transparent 50%);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
+
+.animate-fade-up-delay-1 {
+  animation: fade-up 0.5s ease-out 0.08s both;
+}
+
+.animate-fade-up-delay-2 {
+  animation: fade-up 0.5s ease-out 0.16s both;
+}
+
+.card-hover {
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.card-hover:hover {
+  box-shadow: 0 8px 24px -4px rgba(0, 135, 81, 0.15);
+  transform: translateY(-1px);
+}
+@media (hover: none) {
+  .card-hover:active {
+    transform: scale(0.99);
+  }
+  .card-hover:hover {
+    transform: none;
+  }
+}
+
+input, select, textarea {
+  font-size: 16px;
+}
+
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}

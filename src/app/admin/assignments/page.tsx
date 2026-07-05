@@ -175,7 +175,7 @@ export default function AssignmentsPage() {
                     {req.address_landmark}
                   </p>
                   <p className="text-sm font-semibold text-gabon-green-dark mt-2">
-                    {order.label} — {formatPrice(order.price)}
+                    {order.label} - {formatPrice(order.price)}
                   </p>
                 </div>
               </label>
@@ -206,8 +206,8 @@ export default function AssignmentsPage() {
                 ...agents.map(({ agent, activeCount }) => {
                   const full = activeCount >= MAX_ASSIGNMENTS_PER_AGENT;
                   const label = agent.agent_code
-                    ? `${agent.full_name} (${agent.agent_code}) — ${activeCount}/${MAX_ASSIGNMENTS_PER_AGENT}`
-                    : `${agent.full_name} — ${activeCount}/${MAX_ASSIGNMENTS_PER_AGENT}`;
+                    ? `${agent.full_name} (${agent.agent_code}) - ${activeCount}/${MAX_ASSIGNMENTS_PER_AGENT}`
+                    : `${agent.full_name} - ${activeCount}/${MAX_ASSIGNMENTS_PER_AGENT}`;
                   return {
                     value: agent.id,
                     label: full ? `${label} · Complet` : label,

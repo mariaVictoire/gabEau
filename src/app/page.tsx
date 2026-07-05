@@ -35,7 +35,6 @@ const citizenOptions = [
     href: "/commander",
     title: "Commander",
     description: "Demandez une livraison d'eau en quelques clics",
-    detail: "À partir de 600 FCFA",
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-7 w-7">
         <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0L12 2.69z" />
@@ -44,7 +43,6 @@ const citizenOptions = [
     iconBg: "from-gabon-green to-gabon-blue",
     ring: "ring-gabon-green/10 hover:ring-gabon-green/25",
     shadow: "shadow-gabon-green/10 hover:shadow-gabon-green/20",
-    detailColor: "text-gabon-green",
   },
   {
     href: "/track",
@@ -84,12 +82,12 @@ export default function HomePage() {
             <Logo size="lg" light />
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight tracking-tight">
-            Eau potable
+            Eau
             <br />
             <span className="text-gabon-yellow">à Libreville</span>
           </h1>
           <p className="mt-3 text-sm text-white/80 max-w-xs mx-auto">
-            Commandez ou suivez votre livraison — simple et rapide
+            Commandez ou suivez votre livraison
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -123,7 +121,9 @@ export default function HomePage() {
                 <div className="flex-1 min-w-0 pt-0.5">
                   <p className="text-lg font-bold text-slate-900">{opt.title}</p>
                   <p className="mt-1 text-sm text-slate-500">{opt.description}</p>
-                  <p className={`mt-2 text-sm font-semibold ${opt.detailColor}`}>{opt.detail}</p>
+                  {opt.detail && (
+                    <p className={`mt-2 text-sm font-semibold ${opt.detailColor}`}>{opt.detail}</p>
+                  )}
                 </div>
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-colors group-hover:bg-gabon-green group-hover:text-white">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-5 w-5" aria-hidden>
@@ -138,7 +138,7 @@ export default function HomePage() {
 
       <footer className="border-t border-gabon-green/10 bg-white py-4 text-center safe-bottom">
         <div className="gabon-tricolor mb-3 max-w-[120px] mx-auto rounded-full" aria-hidden />
-        <p className="text-xs text-slate-400">Gab&apos;Eau — Livraison d&apos;eau · Libreville</p>
+        <p className="text-xs text-slate-400">Gab&apos;Eau - Livraison d&apos;eau</p>
         <Link
           href="/connexion"
           className="mt-3 inline-block text-[11px] font-medium text-slate-400 hover:text-gabon-green transition-colors"

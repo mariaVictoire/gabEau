@@ -186,7 +186,7 @@ export function DeliveryDetail({ delivery }: { delivery: Request }) {
         </Card>
       )}
 
-      {/* Sticky action bar — mobile-first for agents */}
+      {/* Sticky action bar - mobile-first for agents */}
       {showStickyActions && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 safe-bottom safe-x shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="mx-auto max-w-lg space-y-2">

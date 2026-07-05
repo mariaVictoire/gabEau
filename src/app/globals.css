@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Couleurs du Gabon — vert, jaune, bleu */
+  /* Couleurs du Gabon - vert, jaune, bleu */
   --color-gabon-green: #008751;
   --color-gabon-green-dark: #006b40;
   --color-gabon-green-light: #e6f5ef;

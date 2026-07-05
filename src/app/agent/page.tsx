@@ -87,7 +87,7 @@ export default function AgentLandingPage() {
       </main>
 
       <footer className="border-t border-gabon-green/10 bg-white py-4 text-center safe-bottom">
-        <p className="text-xs text-slate-400">Gab&apos;Eau — Espace agent</p>
+        <p className="text-xs text-slate-400">Gab&apos;Eau - Espace agent</p>
       </footer>
     </div>
   );

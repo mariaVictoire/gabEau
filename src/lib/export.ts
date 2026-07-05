@@ -50,7 +50,7 @@ export async function exportToPDF(requests: Request[]) {
 
   const doc = new jsPDF({ orientation: "landscape" });
   doc.setFontSize(16);
-  doc.text("Gab'Eau — Liste des demandes", 14, 15);
+  doc.text("Gab'Eau - Liste des demandes", 14, 15);
 
   autoTable(doc, {
     startY: 25,

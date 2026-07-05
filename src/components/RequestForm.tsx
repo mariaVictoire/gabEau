@@ -13,13 +13,14 @@ import {
   calculateOrder,
   formatOrderLabel,
   formatPrice,
-  MAX_CONTAINERS,
-  MAX_CUBIC_METERS,
-  PRICE_PER_CONTAINER_200L,
-  PRICE_PER_CUBIC_METER,
+  getMaxQuantity,
+  getQuantityUnit,
+  PAYMENT_NOTICE,
+  PRODUCT_CATALOG,
+  PRODUCT_TYPES,
 } from "@/lib/business-rules";
 import type { CreateRequestInput, ProductType, Request } from "@/lib/types";
-import { hasPublicSupabaseConfig, SUPABASE_CONFIG_MESSAGE } from "@/lib/supabase/config";
+import { hasPublicSupabaseConfig, getSupabaseConfigMessage } from "@/lib/supabase/config";
 
 const initialForm: CreateRequestInput = {
   full_name: "",
@@ -31,25 +32,15 @@ const initialForm: CreateRequestInput = {
   comment: "",
 };
 
-const productOptions: {
-  value: ProductType;
-  label: string;
-  price: string;
-  detail: string;
-}[] = [
-  {
-    value: "cubic_meter",
-    label: "Mètre cube",
-    price: `${PRICE_PER_CUBIC_METER.toLocaleString("fr-FR")} FCFA / m³`,
-    detail: "1 m³ = 1 000 litres",
-  },
-  {
-    value: "container_200l",
-    label: "Bidon 200 L",
-    price: `${PRICE_PER_CONTAINER_200L.toLocaleString("fr-FR")} FCFA / bidon`,
-    detail: "Format prêt à l'emploi",
-  },
-];
+const productOptions = PRODUCT_TYPES.map((type) => {
+  const config = PRODUCT_CATALOG[type];
+  return {
+    value: type,
+    label: `${config.label} (${config.shortLabel})`,
+    price: `${formatPrice(config.unitPriceFcfa)} / ${config.quantityUnit}`,
+    detail: config.detail,
+  };
+});
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
@@ -108,10 +99,8 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
   const [isPending, startTransition] = useTransition();
   const isAdmin = mode === "admin";
 
-  const maxQty =
-    form.product_type === "cubic_meter" ? MAX_CUBIC_METERS : MAX_CONTAINERS;
-  const unit =
-    form.product_type === "cubic_meter" ? "mètre(s) cube(s)" : "bidon(s)";
+  const maxQty = getMaxQuantity(form.product_type);
+  const unit = getQuantityUnit(form.product_type, form.quantity);
   const order = calculateOrder(form.product_type, form.quantity);
 
   function updateField<K extends keyof CreateRequestInput>(
@@ -151,7 +140,7 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
     e.preventDefault();
     setError("");
     if (!isAdmin && !hasPublicSupabaseConfig()) {
-      setError(SUPABASE_CONFIG_MESSAGE);
+      setError(getSupabaseConfigMessage());
       return;
     }
     startTransition(async () => {
@@ -221,7 +210,7 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
               </div>
             ) : (
               <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-                Pas encore assignée — tous les agents sont peut-être complets. Assignez manuellement
+                Pas encore assignée - tous les agents sont peut-être complets. Assignez manuellement
                 dans Assignations.
               </p>
             )}
@@ -235,9 +224,16 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
     );
   }
 
+  const missingConfig = !isAdmin && !hasPublicSupabaseConfig();
+
   return (
     <Card>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {missingConfig && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900">
+            {getSupabaseConfigMessage()}
+          </div>
+        )}
         <div>
           <SectionTitle>{isAdmin ? "Informations citoyen (appel)" : "Vos coordonnées"}</SectionTitle>
           <div className="space-y-4">
@@ -254,8 +250,8 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
               placeholder="06 XX XX XX"
               hint={
                 isAdmin
-                  ? "Saisissez le numéro appelant — les infos précédentes seront pré-remplies si connues"
-                  : "Vos infos seront pré-remplies si vous avez déjà fait une demande"
+                  ? "Saisissez le numéro appelant - les infos précédentes seront pré-remplies si connues"
+                  : undefined
               }
               value={form.phone}
               onChange={(e) => updateField("phone", e.target.value)}
@@ -287,7 +283,7 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
         <div className="border-t border-slate-100 pt-6">
           <SectionTitle>Votre commande</SectionTitle>
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-3">
               {productOptions.map((opt) => (
                 <button
                   key={opt.value}
@@ -320,7 +316,7 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
             <div className="rounded-xl bg-gradient-to-r from-gabon-green-light to-gabon-blue-light border border-gabon-green/20 px-4 py-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Volume</span>
-                <span className="font-bold text-slate-900">
+                <span className="font-bold text-slate-900 text-right">
                   {formatOrderLabel(form.product_type, form.quantity)}
                 </span>
               </div>
@@ -331,6 +327,8 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
                 </span>
               </div>
             </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">{PAYMENT_NOTICE}</p>
           </div>
         </div>
 

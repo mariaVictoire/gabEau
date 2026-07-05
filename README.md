@@ -71,4 +71,4 @@ Ouvrez [http://localhost:3000](http://localhost:3000).
 
 - Volume estimé : 1-3 pers. = 50L, 4-6 = 100L, 7+ = 150L
 - Priorité haute si plus d'eau + personnes vulnérables
-- Numéro de demande : `EAU-YYYY-000001`
+- Numéro de demande : `EAU-154`

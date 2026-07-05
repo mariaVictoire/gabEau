@@ -8,7 +8,14 @@ import {
   getSupabaseConfigError,
   SUPABASE_CONFIG_MESSAGE,
 } from "@/lib/supabase/service";
-import type { CreateRequestInput, Request, User } from "@/lib/types";
+import { buildDashboardReport, getPeriodRange } from "@/lib/dashboard-report";
+import type {
+  CreateRequestInput,
+  DashboardReport,
+  DashboardReportPeriod,
+  Request,
+  User,
+} from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 async function insertRequest(
@@ -322,6 +329,26 @@ export async function getRequestEvents(requestId: string) {
     .eq("request_id", requestId)
     .order("created_at", { ascending: false });
   return data || [];
+}
+
+export async function getDashboardReport(
+  period: DashboardReportPeriod = "week"
+): Promise<DashboardReport> {
+  const supabase = getServiceClient();
+  const empty = buildDashboardReport(period, []);
+
+  if (!supabase) return empty;
+
+  const { from } = getPeriodRange(period);
+  const { data } = await supabase
+    .from("requests")
+    .select(
+      "status, district, is_urgent, price_fcfa, estimated_volume_liters, product_type, quantity, created_at"
+    )
+    .gte("created_at", from.toISOString());
+
+  if (!data) return empty;
+  return buildDashboardReport(period, data);
 }
 
 export async function getDashboardStats() {

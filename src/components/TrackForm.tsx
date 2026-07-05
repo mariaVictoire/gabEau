@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { PriorityBadge } from "@/components/ui/PriorityBadge";
 import { formatDate, formatPrice, getOrderDisplay } from "@/lib/business-rules";
 import type { Request } from "@/lib/types";
 
@@ -51,7 +50,7 @@ export function TrackForm({
         <form onSubmit={(e) => { e.preventDefault(); search(requestNumber, phone); }} className="space-y-4">
           <Input
             label="Numéro de demande"
-            placeholder="EAU-2026-000154"
+            placeholder="EAU-154"
             required
             value={requestNumber}
             onChange={(e) => setRequestNumber(e.target.value)}
@@ -94,16 +93,7 @@ export function TrackForm({
                 <dd className="font-medium text-slate-800 text-right">{value}</dd>
               </div>
             ))}
-            <div className="flex justify-between items-center py-3">
-              <dt className="text-slate-400">Priorité</dt>
-              <dd><PriorityBadge priority={request.priority} /></dd>
-            </div>
           </dl>
-          {request.is_urgent && (
-            <div className="mt-4 rounded-xl bg-red-50 border border-red-100 p-3 text-center text-sm font-semibold text-red-700">
-              🚨 Demande urgente
-            </div>
-          )}
         </Card>
         );
       })()}

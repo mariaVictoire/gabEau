@@ -23,9 +23,9 @@ export default async function Appel18Page() {
   return (
     <div className="space-y-4 max-w-2xl">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Appel 18 — Prise de commande</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Appel 18 - Prise de commande</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Connecté en tant que <strong className="text-slate-700">{user.full_name}</strong> — la
+          Connecté en tant que <strong className="text-slate-700">{user.full_name}</strong> - la
           demande sera assignée automatiquement à un agent.
         </p>
       </div>

@@ -61,7 +61,7 @@ CREATE TABLE requests (
   comment TEXT,
   product_type TEXT NOT NULL DEFAULT 'cubic_meter',
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-  price_fcfa INTEGER NOT NULL DEFAULT 3000,
+  price_fcfa INTEGER NOT NULL DEFAULT 4000,
   estimated_volume_liters INTEGER NOT NULL,
   status request_status NOT NULL DEFAULT 'received',
   priority request_priority NOT NULL DEFAULT 'medium',
@@ -96,7 +96,7 @@ CREATE TABLE delivery_proofs (
   delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Fonction : générer le numéro de demande EAU-YYYY-000001
+-- Fonction : générer le numéro de demande EAU-154
 CREATE OR REPLACE FUNCTION generate_request_number()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -109,7 +109,7 @@ BEGIN
   ON CONFLICT (year) DO UPDATE
     SET last_number = request_counters.last_number + 1
   RETURNING last_number INTO next_num;
-  NEW.request_number := 'EAU-' || current_year || '-' || LPAD(next_num::TEXT, 6, '0');
+  NEW.request_number := 'EAU-' || next_num::TEXT;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

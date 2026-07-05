@@ -1,4 +1,5 @@
 import type { ProductType, RequestPriority, RequestSituation, RequestStatus } from "./types";
+import { PRODUCT_CATALOG } from "./business-rules";
 
 export const DISTRICTS = [
   "Akanda",
@@ -71,6 +72,8 @@ export const ROLE_LABELS = {
 } as const;
 
 export const PRODUCT_LABELS: Record<ProductType, string> = {
-  cubic_meter: "Mètre cube",
-  container_200l: "Bidon 200 L",
+  cubic_meter: PRODUCT_CATALOG.cubic_meter.label,
+  container_500l: PRODUCT_CATALOG.container_500l.label,
+  container_200l: PRODUCT_CATALOG.container_200l.label,
+  container_100l: PRODUCT_CATALOG.container_100l.label,
 };

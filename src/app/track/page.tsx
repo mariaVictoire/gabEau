@@ -8,7 +8,7 @@ export default async function TrackPage({
 }) {
   const params = await searchParams;
   return (
-    <CitizenLayout>
+    <CitizenLayout hideTrackLink>
       <TrackForm
         initialNumber={params.number ?? ""}
         initialPhone={params.phone ?? ""}

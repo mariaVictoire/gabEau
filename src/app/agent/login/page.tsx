@@ -43,7 +43,7 @@ export default function AgentLoginPage() {
           <Logo size="lg" light />
         </Link>
         <h1 className="text-xl font-bold text-white">Connexion agent</h1>
-        <p className="text-sm text-white/85 mt-1">Code agent + PIN — pas besoin d&apos;email</p>
+        <p className="text-sm text-white/85 mt-1">Code agent + PIN - pas besoin d&apos;email</p>
       </header>
 
       <main className="flex-1 flex items-start justify-center px-4 -mt-6 pb-8">

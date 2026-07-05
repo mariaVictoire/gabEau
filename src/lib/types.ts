@@ -11,7 +11,11 @@ export type RequestStatus =
 
 export type RequestSituation = "no_water" | "low_stock" | "preventive";
 
-export type ProductType = "cubic_meter" | "container_200l";
+export type ProductType =
+  | "cubic_meter"
+  | "container_500l"
+  | "container_200l"
+  | "container_100l";
 
 export type RequestPriority = "low" | "medium" | "high";
 
@@ -103,4 +107,28 @@ export interface DashboardStats {
   delivered: number;
   urgent: number;
   byDistrict: { district: string; count: number }[];
+}
+
+export type DashboardReportPeriod = "day" | "week" | "month";
+
+export interface DashboardReport {
+  period: DashboardReportPeriod;
+  periodLabel: string;
+  fromDate: string;
+  toDate: string;
+  total: number;
+  pending: number;
+  assigned: number;
+  delivered: number;
+  cancelled: number;
+  failed: number;
+  urgent: number;
+  revenueFcfa: number;
+  volumeLiters: number;
+  deliveryRate: number;
+  avgOrderValue: number;
+  byDistrict: { district: string; count: number }[];
+  byStatus: { status: RequestStatus; count: number }[];
+  byTimeline: { key: string; label: string; count: number; delivered: number }[];
+  byProduct: { productType: ProductType; label: string; count: number; revenue: number }[];
 }

@@ -9,7 +9,7 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Gab'Eau — Livraison d'eau à Libreville",
+  title: "Gab'Eau - Livraison d'eau",
   description:
     "Demandez une livraison d'eau à Libreville sans créer de compte.",
   appleWebApp: {

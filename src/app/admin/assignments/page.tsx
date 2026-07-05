@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { getAgents, getRequests, assignRequests } from "@/actions/requests";
+import { assignRequests, getAgentsWithWorkload, getRequests } from "@/actions/requests";
 import { getCurrentUser } from "@/actions/auth";
+import { AgentWorkloadBar } from "@/components/admin/AgentWorkloadBar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { MAX_ASSIGNMENTS_PER_AGENT } from "@/lib/auto-assign";
 import { formatPrice, getOrderDisplay } from "@/lib/business-rules";
 import type { Request, User } from "@/lib/types";
 
+type AgentWorkload = { agent: User; activeCount: number };
+
 export default function AssignmentsPage() {
   const [requests, setRequests] = useState<Request[]>([]);
-  const [agents, setAgents] = useState<User[]>([]);
+  const [agents, setAgents] = useState<AgentWorkload[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [agentId, setAgentId] = useState("");
   const [message, setMessage] = useState("");
@@ -20,11 +24,13 @@ export default function AssignmentsPage() {
 
   function loadPending() {
     startTransition(async () => {
-      const [received, inReview] = await Promise.all([
+      const [received, inReview, agts] = await Promise.all([
         getRequests({ status: "received" }),
         getRequests({ status: "in_review" }),
+        getAgentsWithWorkload(),
       ]);
       setRequests([...received, ...inReview]);
+      setAgents(agts);
     });
   }
 
@@ -33,11 +39,12 @@ export default function AssignmentsPage() {
       const [received, inReview, agts] = await Promise.all([
         getRequests({ status: "received" }),
         getRequests({ status: "in_review" }),
-        getAgents(),
+        getAgentsWithWorkload(),
       ]);
       setRequests([...received, ...inReview]);
-      setAgents(agts as User[]);
-      if (agts.length > 0) setAgentId(agts[0].id);
+      setAgents(agts);
+      const firstAvailable = agts.find((a) => a.activeCount < MAX_ASSIGNMENTS_PER_AGENT);
+      if (firstAvailable) setAgentId(firstAvailable.agent.id);
     });
   }, []);
 
@@ -86,9 +93,34 @@ export default function AssignmentsPage() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Assigner les livraisons</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Sélectionnez les demandes, choisissez un agent, puis validez.
+          Les nouvelles commandes sont assignées automatiquement (max. {MAX_ASSIGNMENTS_PER_AGENT}{" "}
+          par agent). Réassignez ici si besoin.
         </p>
       </div>
+
+      {agents.length > 0 && (
+        <Card>
+          <h2 className="font-bold text-slate-900 mb-3">Charge des agents</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {agents.map(({ agent, activeCount }) => (
+              <div
+                key={agent.id}
+                className="rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-3"
+              >
+                <p className="font-semibold text-slate-900 text-sm truncate">{agent.full_name}</p>
+                {agent.agent_code && (
+                  <p className="text-gabon-green-dark font-mono text-xs font-bold mt-0.5">
+                    {agent.agent_code}
+                  </p>
+                )}
+                <div className="mt-2">
+                  <AgentWorkloadBar activeCount={activeCount} compact />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -171,10 +203,16 @@ export default function AssignmentsPage() {
               onChange={(e) => setAgentId(e.target.value)}
               options={[
                 { value: "", label: "Choisir un agent..." },
-                ...agents.map((a) => ({
-                  value: a.id,
-                  label: a.agent_code ? `${a.full_name} (${a.agent_code})` : a.full_name,
-                })),
+                ...agents.map(({ agent, activeCount }) => {
+                  const full = activeCount >= MAX_ASSIGNMENTS_PER_AGENT;
+                  const label = agent.agent_code
+                    ? `${agent.full_name} (${agent.agent_code}) — ${activeCount}/${MAX_ASSIGNMENTS_PER_AGENT}`
+                    : `${agent.full_name} — ${activeCount}/${MAX_ASSIGNMENTS_PER_AGENT}`;
+                  return {
+                    value: agent.id,
+                    label: full ? `${label} · Complet` : label,
+                  };
+                }),
               ]}
             />
             <div className="flex items-end">

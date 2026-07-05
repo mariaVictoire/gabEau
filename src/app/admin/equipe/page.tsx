@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { createAgent, deleteAgent, getStaffAgents } from "@/actions/staff";
+import { createAgent, deleteAgent } from "@/actions/staff";
+import { getAgentsWithWorkload } from "@/actions/requests";
+import { AgentWorkloadBar } from "@/components/admin/AgentWorkloadBar";
 import {
   buildAgentCredentialsMessage,
   buildSmsLink,
@@ -13,6 +15,8 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import type { User } from "@/lib/types";
+
+type AgentWorkload = { agent: User; activeCount: number };
 
 type AgentCredentials = {
   full_name: string;
@@ -26,7 +30,7 @@ function AgentList({
   isPending,
   onDelete,
 }: {
-  agents: User[];
+  agents: AgentWorkload[];
   isPending: boolean;
   onDelete: (agent: User) => void;
 }) {
@@ -40,23 +44,26 @@ function AgentList({
 
   return (
     <ul className="space-y-2">
-      {agents.map((a) => (
+      {agents.map(({ agent, activeCount }) => (
         <li
-          key={a.id}
+          key={agent.id}
           className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3 text-sm"
         >
-          <div className="min-w-0">
-            <p className="font-semibold text-slate-900">{a.full_name}</p>
-            {a.agent_code && (
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-900">{agent.full_name}</p>
+            {agent.agent_code && (
               <p className="text-gabon-green-dark font-mono text-sm font-bold mt-1">
-                {a.agent_code}
+                {agent.agent_code}
               </p>
             )}
-            {a.phone && <p className="text-slate-500 text-xs mt-1">{a.phone}</p>}
+            {agent.phone && <p className="text-slate-500 text-xs mt-1">{agent.phone}</p>}
+            <div className="mt-3">
+              <AgentWorkloadBar activeCount={activeCount} />
+            </div>
           </div>
           <button
             type="button"
-            onClick={() => onDelete(a)}
+            onClick={() => onDelete(agent)}
             disabled={isPending}
             className="shrink-0 text-xs font-semibold text-red-500 hover:text-red-700 min-h-[44px] px-2"
           >
@@ -69,7 +76,7 @@ function AgentList({
 }
 
 export default function EquipePage() {
-  const [agents, setAgents] = useState<User[]>([]);
+  const [agents, setAgents] = useState<AgentWorkload[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [error, setError] = useState("");
   const [recap, setRecap] = useState<AgentCredentials | null>(null);
@@ -103,7 +110,7 @@ export default function EquipePage() {
 
   function loadData() {
     startTransition(async () => {
-      const agts = await getStaffAgents();
+      const agts = await getAgentsWithWorkload();
       setAgents(agts);
     });
   }

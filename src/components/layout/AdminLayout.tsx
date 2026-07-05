@@ -9,6 +9,7 @@ import { HomeLink } from "@/components/ui/HomeLink";
 import { Logo } from "@/components/ui/Logo";
 
 const navItems = [
+  { href: "/admin/appel-18", label: "Appel 18", short: "Appel 18", icon: "📞" },
   { href: "/admin/dashboard", label: "Tableau de bord", short: "Accueil", icon: "📊" },
   { href: "/admin/requests", label: "Demandes", short: "Demandes", icon: "📋" },
   { href: "/admin/assignments", label: "Assignations", short: "Assigner", icon: "🚚" },

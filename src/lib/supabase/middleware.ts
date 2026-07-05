@@ -40,6 +40,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (path.startsWith("/admin") && !publicAdminPaths.includes(path) && user) {
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.role === "agent") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/agent/deliveries";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (path.startsWith("/agent") && !publicAgentPaths.includes(path) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/agent/login";

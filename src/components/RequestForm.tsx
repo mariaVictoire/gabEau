@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createRequest, getPreviousRequestByPhone } from "@/actions/requests";
+import { createPhoneOrder, createRequest, getPreviousRequestByPhone } from "@/actions/requests";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -18,7 +18,7 @@ import {
   PRICE_PER_CONTAINER_200L,
   PRICE_PER_CUBIC_METER,
 } from "@/lib/business-rules";
-import type { CreateRequestInput, ProductType } from "@/lib/types";
+import type { CreateRequestInput, ProductType, Request } from "@/lib/types";
 import { hasPublicSupabaseConfig, SUPABASE_CONFIG_MESSAGE } from "@/lib/supabase/config";
 
 const initialForm: CreateRequestInput = {
@@ -100,11 +100,13 @@ function QuantityStepper({
   );
 }
 
-export function RequestForm() {
+export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }) {
   const router = useRouter();
   const [form, setForm] = useState<CreateRequestInput>(initialForm);
   const [error, setError] = useState("");
+  const [phoneOrderSuccess, setPhoneOrderSuccess] = useState<Request | null>(null);
   const [isPending, startTransition] = useTransition();
+  const isAdmin = mode === "admin";
 
   const maxQty =
     form.product_type === "cubic_meter" ? MAX_CUBIC_METERS : MAX_CONTAINERS;
@@ -148,15 +150,22 @@ export function RequestForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!hasPublicSupabaseConfig()) {
+    if (!isAdmin && !hasPublicSupabaseConfig()) {
       setError(SUPABASE_CONFIG_MESSAGE);
       return;
     }
     startTransition(async () => {
       try {
-        const result = await createRequest(form);
+        const result = isAdmin
+          ? await createPhoneOrder(form)
+          : await createRequest(form);
         if (result.success) {
-          router.push(`/confirmation/${result.request.request_number}`);
+          if (isAdmin) {
+            setPhoneOrderSuccess(result.request);
+            setForm(initialForm);
+          } else {
+            router.push(`/confirmation/${result.request.request_number}`);
+          }
         } else {
           setError(result.error);
         }
@@ -168,11 +177,69 @@ export function RequestForm() {
     });
   }
 
+  function handleNewPhoneOrder() {
+    setPhoneOrderSuccess(null);
+    setError("");
+  }
+
+  if (isAdmin && phoneOrderSuccess) {
+    const agent = phoneOrderSuccess.assigned_agent;
+    const assigned = phoneOrderSuccess.status === "assigned" && agent;
+
+    return (
+      <Card>
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-gabon-green-light text-xl mb-2">
+              ✓
+            </div>
+            <h2 className="text-lg font-bold text-slate-900">Commande enregistrée</h2>
+            <p className="text-sm text-slate-500 mt-1">
+              Communiquez le numéro de suivi au citoyen par téléphone.
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-gabon-green-light/40 border border-gabon-green/20 p-4 space-y-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase text-slate-400">N° de demande</p>
+              <p className="font-mono text-xl font-bold text-gabon-green-dark">
+                {phoneOrderSuccess.request_number}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase text-slate-400">Citoyen</p>
+              <p className="font-semibold text-slate-900">{phoneOrderSuccess.full_name}</p>
+              <p className="text-sm text-slate-600">{phoneOrderSuccess.phone}</p>
+            </div>
+            {assigned ? (
+              <div className="rounded-lg bg-white/80 px-3 py-2">
+                <p className="text-[10px] font-semibold uppercase text-slate-400">Agent assigné</p>
+                <p className="font-semibold text-slate-900">{agent.full_name}</p>
+                {agent.agent_code && (
+                  <p className="text-gabon-green-dark font-mono text-sm font-bold">{agent.agent_code}</p>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+                Pas encore assignée — tous les agents sont peut-être complets. Assignez manuellement
+                dans Assignations.
+              </p>
+            )}
+          </div>
+
+          <Button type="button" size="lg" className="w-full" onClick={handleNewPhoneOrder}>
+            Nouvelle commande (appel 18)
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <SectionTitle>Vos coordonnées</SectionTitle>
+          <SectionTitle>{isAdmin ? "Informations citoyen (appel)" : "Vos coordonnées"}</SectionTitle>
           <div className="space-y-4">
             <Input
               label="Nom complet"
@@ -185,7 +252,11 @@ export function RequestForm() {
               type="tel"
               required
               placeholder="06 XX XX XX"
-              hint="Vos infos seront pré-remplies si vous avez déjà fait une demande"
+              hint={
+                isAdmin
+                  ? "Saisissez le numéro appelant — les infos précédentes seront pré-remplies si connues"
+                  : "Vos infos seront pré-remplies si vous avez déjà fait une demande"
+              }
               value={form.phone}
               onChange={(e) => updateField("phone", e.target.value)}
               onBlur={handlePhoneBlur}
@@ -277,7 +348,7 @@ export function RequestForm() {
         )}
 
         <Button type="submit" size="lg" loading={isPending} className="w-full">
-          Commander
+          {isAdmin ? "Enregistrer et assigner" : "Commander"}
         </Button>
       </form>
     </Card>

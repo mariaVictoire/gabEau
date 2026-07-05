@@ -114,3 +114,49 @@ export async function getCurrentUser(): Promise<User | null> {
 
   return profile as User | null;
 }
+
+const STAFF_ROLES: UserRole[] = ["operator", "coordinator", "admin"];
+
+export async function requireStaffUser(): Promise<
+  { user: User } | { error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (!authUser) {
+    return { error: "Session expirée. Reconnectez-vous sur /admin/login." };
+  }
+
+  const admin = getServiceClient();
+  if (!admin) {
+    return { error: "Supabase n'est pas configuré côté serveur." };
+  }
+
+  const { data: profile } = await admin
+    .from("users")
+    .select("*")
+    .eq("id", authUser.id)
+    .single();
+
+  if (!profile) {
+    return {
+      error:
+        "Profil introuvable. Créez votre profil dans Supabase (table users) avec le rôle operator, coordinator ou admin.",
+    };
+  }
+
+  if (profile.role === "agent") {
+    return {
+      error:
+        "Compte agent détecté. Connectez-vous avec un compte opérateur ou coordinateur via /admin/login.",
+    };
+  }
+
+  if (!STAFF_ROLES.includes(profile.role as UserRole)) {
+    return { error: "Accès réservé au personnel Gab'Eau." };
+  }
+
+  return { user: profile as User };
+}

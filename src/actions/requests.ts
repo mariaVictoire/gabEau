@@ -1,12 +1,80 @@
 "use server";
 
+import { requireStaffUser } from "@/actions/auth";
+import { autoAssignRequest, assignRequestToAgent, getAgentAssignmentCounts } from "@/lib/auto-assign";
 import { calculateOrder, calculatePriority, formatPhone } from "@/lib/business-rules";
 import {
   getServiceClient,
   getSupabaseConfigError,
   SUPABASE_CONFIG_MESSAGE,
 } from "@/lib/supabase/service";
-import type { CreateRequestInput, Request } from "@/lib/types";
+import type { CreateRequestInput, Request, User } from "@/lib/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+async function insertRequest(
+  supabase: SupabaseClient,
+  input: CreateRequestInput,
+  options: { operatorId?: string; source: "web" | "phone" }
+): Promise<{ success: true; request: Request } | { success: false; error: string }> {
+  const phone = formatPhone(input.phone);
+  const priority = calculatePriority();
+  const { estimated_volume_liters, price_fcfa } = calculateOrder(
+    input.product_type,
+    input.quantity
+  );
+
+  const { data, error } = await supabase
+    .from("requests")
+    .insert({
+      request_number: "",
+      full_name: input.full_name,
+      phone,
+      district: input.district,
+      address_landmark: input.address_landmark,
+      household_size: 1,
+      situation: "no_water",
+      has_children: false,
+      has_elderly: false,
+      has_sick: false,
+      comment: input.comment || null,
+      product_type: input.product_type,
+      quantity: input.quantity,
+      price_fcfa,
+      estimated_volume_liters,
+      priority,
+      status: "received",
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error("createRequest error:", error);
+    return { success: false, error: "Erreur lors de la création de la demande." };
+  }
+
+  const createdComment =
+    options.source === "phone"
+      ? "Demande enregistrée par l'opérateur (appel 18)"
+      : "Demande créée par le citoyen";
+
+  await supabase.from("request_events").insert({
+    request_id: data.id,
+    event_type: "created",
+    new_status: "received",
+    comment: createdComment,
+    created_by: options.operatorId ?? null,
+  });
+
+  await autoAssignRequest(supabase, data.id);
+
+  const { data: finalRequest } = await supabase
+    .from("requests")
+    .select("*, assigned_agent:users!assigned_agent_id(id, full_name, agent_code)")
+    .eq("id", data.id)
+    .single();
+
+  return { success: true, request: (finalRequest ?? data) as Request };
+}
 
 export async function createRequest(
   input: CreateRequestInput
@@ -19,50 +87,30 @@ export async function createRequest(
         error: getSupabaseConfigError() ?? SUPABASE_CONFIG_MESSAGE,
       };
     }
-    const phone = formatPhone(input.phone);
-    const priority = calculatePriority();
-    const { estimated_volume_liters, price_fcfa } = calculateOrder(
-      input.product_type,
-      input.quantity
-    );
+    return insertRequest(supabase, input, { source: "web" });
+  } catch {
+    return { success: false, error: "Erreur serveur." };
+  }
+}
 
-    const { data, error } = await supabase
-      .from("requests")
-      .insert({
-        request_number: "",
-        full_name: input.full_name,
-        phone,
-        district: input.district,
-        address_landmark: input.address_landmark,
-        household_size: 1,
-        situation: "no_water",
-        has_children: false,
-        has_elderly: false,
-        has_sick: false,
-        comment: input.comment || null,
-        product_type: input.product_type,
-        quantity: input.quantity,
-        price_fcfa,
-        estimated_volume_liters,
-        priority,
-        status: "received",
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("createRequest error:", error);
-      return { success: false, error: "Erreur lors de la création de la demande." };
+export async function createPhoneOrder(
+  input: CreateRequestInput
+): Promise<{ success: true; request: Request } | { success: false; error: string }> {
+  try {
+    const staff = await requireStaffUser();
+    if ("error" in staff) {
+      return { success: false, error: staff.error };
     }
 
-    await supabase.from("request_events").insert({
-      request_id: data.id,
-      event_type: "created",
-      new_status: "received",
-      comment: "Demande créée par le citoyen",
-    });
+    const supabase = getServiceClient();
+    if (!supabase) {
+      return {
+        success: false,
+        error: getSupabaseConfigError() ?? SUPABASE_CONFIG_MESSAGE,
+      };
+    }
 
-    return { success: true, request: data as Request };
+    return insertRequest(supabase, input, { operatorId: staff.user.id, source: "phone" });
   } catch {
     return { success: false, error: "Erreur serveur." };
   }
@@ -254,35 +302,15 @@ export async function assignRequests(
 
   const { data: agent } = await supabase
     .from("users")
-    .select("full_name, agent_code")
+    .select("id, full_name, agent_code")
     .eq("id", agentId)
     .single();
 
-  const agentLabel = agent?.agent_code
-    ? `${agent.full_name} (${agent.agent_code})`
-    : agent?.full_name || "agent";
-
-  const { error } = await supabase
-    .from("requests")
-    .update({
-      assigned_agent_id: agentId,
-      status: "assigned",
-    })
-    .in("id", requestIds);
-
-  if (error) return { success: false, error: error.message };
-
-  for (const id of requestIds) {
-    await supabase.from("request_events").insert({
-      request_id: id,
-      event_type: "assignment",
-      new_status: "assigned",
-      comment: `Assignée à ${agentLabel}`,
-      created_by: userId,
-    });
+  if (!agent) {
+    return { success: false, error: "Agent introuvable." };
   }
 
-  return { success: true };
+  return assignRequestToAgent(supabase, requestIds, agent, { userId });
 }
 
 export async function getRequestEvents(requestId: string) {
@@ -341,6 +369,23 @@ export async function getAgents() {
     .eq("role", "agent")
     .order("full_name");
   return data || [];
+}
+
+export async function getAgentsWithWorkload(): Promise<
+  { agent: User; activeCount: number }[]
+> {
+  const supabase = getServiceClient();
+  if (!supabase) return [];
+
+  const [agents, counts] = await Promise.all([
+    getAgents(),
+    getAgentAssignmentCounts(supabase),
+  ]);
+
+  return agents.map((agent) => ({
+    agent: agent as User,
+    activeCount: counts.get(agent.id) || 0,
+  }));
 }
 
 export async function getAgentDeliveries(agentId: string, todayOnly = true) {

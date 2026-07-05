@@ -1,14 +1,20 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getDashboardStats, getRequests } from "@/actions/requests";
+import { getAgentsWithWorkload, getDashboardStats, getRequests } from "@/actions/requests";
+import { AgentWorkloadBar } from "@/components/admin/AgentWorkloadBar";
+import { MAX_ASSIGNMENTS_PER_AGENT } from "@/lib/auto-assign";
 import { Card } from "@/components/ui/Card";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatDate, getOrderDisplay } from "@/lib/business-rules";
 
 export default async function DashboardPage() {
-  const stats = await getDashboardStats();
-  const recent = (await getRequests()).slice(0, 6);
+  const [stats, recent, agents] = await Promise.all([
+    getDashboardStats(),
+    getRequests(),
+    getAgentsWithWorkload(),
+  ]);
+  const recentRequests = recent.slice(0, 6);
   const deliveryRate =
     stats.total > 0 ? Math.round((stats.delivered / stats.total) * 100) : 0;
 
@@ -21,12 +27,20 @@ export default async function DashboardPage() {
             Vue d&apos;ensemble de l&apos;activité Gab&apos;Eau
           </p>
         </div>
-        <Link
-          href="/admin/assignments"
-          className="inline-flex items-center justify-center rounded-xl bg-gabon-green px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-gabon-green-dark transition-colors min-h-[44px]"
-        >
-          Assigner des livraisons →
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/appel-18"
+            className="inline-flex items-center justify-center rounded-xl bg-gabon-blue px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-gabon-blue-dark transition-colors min-h-[44px]"
+          >
+            Appel 18 — Nouvelle commande
+          </Link>
+          <Link
+            href="/admin/assignments"
+            className="inline-flex items-center justify-center rounded-xl bg-gabon-green px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-gabon-green-dark transition-colors min-h-[44px]"
+          >
+            Assignations →
+          </Link>
+        </div>
       </div>
 
       {/* Chiffres clés */}
@@ -85,6 +99,43 @@ export default async function DashboardPage() {
         </div>
       </Card>
 
+      {agents.length > 0 && (
+        <Card>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Charge des agents</h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Livraisons en cours (max. {MAX_ASSIGNMENTS_PER_AGENT} par agent)
+              </p>
+            </div>
+            <Link
+              href="/admin/equipe"
+              className="text-xs font-semibold text-gabon-green hover:underline"
+            >
+              Gérer →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {agents.map(({ agent, activeCount }) => (
+              <div
+                key={agent.id}
+                className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-3"
+              >
+                <p className="font-semibold text-slate-900 text-sm truncate">{agent.full_name}</p>
+                {agent.agent_code && (
+                  <p className="text-gabon-green-dark font-mono text-xs font-bold mt-0.5">
+                    {agent.agent_code}
+                  </p>
+                )}
+                <div className="mt-2">
+                  <AgentWorkloadBar activeCount={activeCount} compact />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Dernières demandes */}
         <Card>
@@ -94,11 +145,11 @@ export default async function DashboardPage() {
               Voir tout →
             </Link>
           </div>
-          {recent.length === 0 ? (
+          {recentRequests.length === 0 ? (
             <p className="text-slate-400 text-sm text-center py-8">Aucune demande pour le moment.</p>
           ) : (
             <div className="space-y-2">
-              {recent.map((req) => (
+              {recentRequests.map((req) => (
                 <Link
                   key={req.id}
                   href="/admin/requests"

@@ -3,7 +3,7 @@ import { RequestForm } from "@/components/RequestForm";
 
 export default function CommanderPage() {
   return (
-    <CitizenLayout>
+    <CitizenLayout hideTrackLink>
       <div className="mb-5 text-center">
         <h1 className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight">
           Besoin d&apos;eau{" "}

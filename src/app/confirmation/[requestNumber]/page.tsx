@@ -19,7 +19,7 @@ export default async function ConfirmationPage({
   const order = getOrderDisplay(request);
 
   return (
-    <CitizenLayout>
+    <CitizenLayout hideTrackLink>
       <Card className="text-center overflow-hidden !p-0">
         <div className="bg-gradient-to-br from-emerald-500 to-green-600 px-6 py-8 text-white">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm text-3xl mb-3">

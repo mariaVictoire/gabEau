@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { createPhoneOrder, createRequest, getPreviousRequestByPhone } from "@/actions/requests";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -12,9 +12,11 @@ import { DISTRICTS } from "@/lib/constants";
 import {
   calculateOrder,
   formatOrderLabel,
+  formatPhone,
   formatPrice,
   getMaxQuantity,
   getQuantityUnit,
+  isPhoneCompleteForLookup,
   PAYMENT_NOTICE,
   PRODUCT_CATALOG,
   PRODUCT_TYPES,
@@ -95,6 +97,9 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
   const router = useRouter();
   const [form, setForm] = useState<CreateRequestInput>(initialForm);
   const [error, setError] = useState("");
+  const [prefillNotice, setPrefillNotice] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(false);
+  const lastLookupKey = useRef<string | null>(null);
   const [phoneOrderSuccess, setPhoneOrderSuccess] = useState<Request | null>(null);
   const [isPending, startTransition] = useTransition();
   const isAdmin = mode === "admin";
@@ -118,22 +123,55 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
     }));
   }
 
-  async function handlePhoneBlur() {
-    if (form.phone.length < 8 || !hasPublicSupabaseConfig()) return;
+  async function lookupPreviousOrder(phone: string) {
+    if (!isPhoneCompleteForLookup(phone) || !hasPublicSupabaseConfig()) {
+      setPrefillNotice(false);
+      return;
+    }
+
+    const lookupKey = formatPhone(phone);
+    if (lastLookupKey.current === lookupKey) return;
+
+    setIsLookingUp(true);
     try {
-      const previous = await getPreviousRequestByPhone(form.phone);
+      const previous = await getPreviousRequestByPhone(phone);
+      lastLookupKey.current = lookupKey;
       if (previous) {
         setForm((prev) => ({
           ...prev,
           ...previous,
+          phone: lookupKey,
           comment: "",
           quantity: previous.quantity ?? 1,
           product_type: previous.product_type ?? "cubic_meter",
         }));
+        setPrefillNotice(true);
+      } else {
+        setPrefillNotice(false);
       }
     } catch {
       // Ignore network errors (e.g. dev server restart)
+    } finally {
+      setIsLookingUp(false);
     }
+  }
+
+  useEffect(() => {
+    if (!isPhoneCompleteForLookup(form.phone)) {
+      lastLookupKey.current = null;
+      setPrefillNotice(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void lookupPreviousOrder(form.phone);
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [form.phone]);
+
+  function handlePhoneBlur(e: React.FocusEvent<HTMLInputElement>) {
+    void lookupPreviousOrder(e.target.value);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -238,24 +276,37 @@ export function RequestForm({ mode = "citizen" }: { mode?: "citizen" | "admin" }
           <SectionTitle>{isAdmin ? "Informations citoyen (appel)" : "Vos coordonnées"}</SectionTitle>
           <div className="space-y-4">
             <Input
+              label="Numéro de téléphone"
+              type="tel"
+              required
+              autoFocus
+              placeholder="06 XX XX XX"
+              hint={
+                isAdmin
+                  ? "Commencez par le numéro appelant - vos infos seront retrouvées automatiquement"
+                  : "Commencez par votre numéro - vos infos se remplissent si vous avez déjà commandé"
+              }
+              value={form.phone}
+              onChange={(e) => {
+                lastLookupKey.current = null;
+                setPrefillNotice(false);
+                updateField("phone", e.target.value);
+              }}
+              onBlur={handlePhoneBlur}
+            />
+            {isLookingUp && (
+              <p className="text-xs text-slate-400">Recherche de vos informations...</p>
+            )}
+            {prefillNotice && !isLookingUp && (
+              <div className="rounded-xl bg-gabon-green-light/60 border border-gabon-green/20 px-3 py-2 text-sm text-gabon-green-dark">
+                Nous avons retrouvé vos informations. Vérifiez-les avant de commander.
+              </div>
+            )}
+            <Input
               label="Nom complet"
               required
               value={form.full_name}
               onChange={(e) => updateField("full_name", e.target.value)}
-            />
-            <Input
-              label="Numéro de téléphone"
-              type="tel"
-              required
-              placeholder="06 XX XX XX"
-              hint={
-                isAdmin
-                  ? "Saisissez le numéro appelant - les infos précédentes seront pré-remplies si connues"
-                  : undefined
-              }
-              value={form.phone}
-              onChange={(e) => updateField("phone", e.target.value)}
-              onBlur={handlePhoneBlur}
             />
           </div>
         </div>

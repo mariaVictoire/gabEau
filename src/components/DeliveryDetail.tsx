@@ -2,73 +2,51 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import {
-  startDelivery,
-  completeDelivery,
-  failDelivery,
-  uploadDeliveryPhoto,
-} from "@/actions/requests";
-import { getCurrentUser } from "@/actions/auth";
+import { startDelivery, completeDelivery, failDelivery } from "@/actions/requests";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { formatPrice, getOrderDisplay } from "@/lib/business-rules";
 import type { Request } from "@/lib/types";
 
-export function DeliveryDetail({ delivery }: { delivery: Request }) {
+export function DeliveryDetail({
+  delivery,
+  agentId,
+}: {
+  delivery: Request;
+  agentId: string;
+}) {
   const router = useRouter();
-  const [showComplete, setShowComplete] = useState(false);
   const [showFail, setShowFail] = useState(false);
-  const [personMet, setPersonMet] = useState("");
-  const [comment, setComment] = useState("");
   const [failComment, setFailComment] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function handleStart() {
     startTransition(async () => {
-      const user = await getCurrentUser();
-      if (!user) return;
-      await startDelivery(delivery.id, user.id);
+      await startDelivery(delivery.id, agentId);
       setMessage("Livraison démarrée.");
       router.refresh();
     });
   }
 
   function handleComplete() {
-    if (!personMet.trim()) {
-      setMessage("Indiquez le nom de la personne rencontrée.");
-      return;
-    }
     startTransition(async () => {
-      const user = await getCurrentUser();
-      if (!user) return;
-      let photoUrl: string | undefined;
-      if (photo) {
-        photoUrl = (await uploadDeliveryPhoto(photo, delivery.id)) || undefined;
-      }
-      await completeDelivery(delivery.id, user.id, personMet, comment, photoUrl);
+      await completeDelivery(delivery.id, agentId, delivery.full_name);
       router.push("/agent/deliveries");
-      router.refresh();
     });
   }
 
   function handleFail() {
     startTransition(async () => {
-      const user = await getCurrentUser();
-      if (!user) return;
-      await failDelivery(delivery.id, user.id, failComment);
+      await failDelivery(delivery.id, agentId, failComment);
       router.push("/agent/deliveries");
-      router.refresh();
     });
   }
 
   const isActive = ["assigned", "in_progress"].includes(delivery.status);
-  const showStickyActions =
-    isActive && !showComplete && !showFail;
+  const showStickyActions = isActive && !showFail;
   const order = getOrderDisplay(delivery);
 
   return (
@@ -125,45 +103,6 @@ export function DeliveryDetail({ delivery }: { delivery: Request }) {
         </div>
       )}
 
-      {showComplete && (
-        <Card>
-          <h2 className="font-bold mb-4 text-slate-900">Confirmation de livraison</h2>
-          <div className="space-y-4">
-            <Input
-              label="Nom de la personne rencontrée"
-              required
-              value={personMet}
-              onChange={(e) => setPersonMet(e.target.value)}
-            />
-            <Textarea
-              label="Commentaire (optionnel)"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-            />
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Photo de preuve (optionnel)
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
-                className="w-full text-base file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700"
-              />
-            </div>
-            <div className="flex flex-col gap-3">
-              <Button variant="success" size="lg" onClick={handleComplete} loading={isPending}>
-                Confirmer la livraison
-              </Button>
-              <Button variant="secondary" size="lg" onClick={() => setShowComplete(false)}>
-                Annuler
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-
       {showFail && (
         <Card>
           <h2 className="font-bold mb-4 text-slate-900">Échec de livraison</h2>
@@ -186,13 +125,12 @@ export function DeliveryDetail({ delivery }: { delivery: Request }) {
         </Card>
       )}
 
-      {/* Sticky action bar - mobile-first for agents */}
       {showStickyActions && (
         <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200 px-4 py-3 safe-bottom safe-x shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
           <div className="mx-auto max-w-lg space-y-2">
             {delivery.status === "assigned" && (
               <Button size="lg" className="w-full" onClick={handleStart} loading={isPending}>
-                🚚 Démarrer la livraison
+                Démarrer la livraison
               </Button>
             )}
             {delivery.status === "in_progress" && (
@@ -201,17 +139,19 @@ export function DeliveryDetail({ delivery }: { delivery: Request }) {
                   size="lg"
                   variant="success"
                   className="w-full"
-                  onClick={() => setShowComplete(true)}
+                  onClick={handleComplete}
+                  loading={isPending}
                 >
-                  ✓ Marquer comme livrée
+                  Marquer comme livrée
                 </Button>
                 <Button
                   size="lg"
                   variant="danger"
                   className="w-full"
                   onClick={() => setShowFail(true)}
+                  disabled={isPending}
                 >
-                  ✕ Échec de livraison
+                  Échec de livraison
                 </Button>
               </>
             )}

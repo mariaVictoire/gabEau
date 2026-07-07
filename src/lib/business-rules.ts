@@ -127,7 +127,40 @@ export function calculatePriority(): RequestPriority {
 }
 
 export function formatPhone(phone: string): string {
-  return phone.replace(/\s/g, "").replace(/^\+241/, "0");
+  let digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("241")) {
+    digits = digits.slice(3);
+  }
+  if (digits.length === 8 && /^[67]/.test(digits)) {
+    digits = `0${digits}`;
+  }
+  return digits;
+}
+
+export function phoneDigitsOnly(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+/** True when enough digits to search a previous order (Gabon: 8 local digits). */
+export function isPhoneCompleteForLookup(phone: string): boolean {
+  const digits = phoneDigitsOnly(phone).replace(/^241/, "");
+  return digits.length >= 8;
+}
+
+/** Match exact stored values and common legacy formats. */
+export function phoneLookupVariants(phone: string): string[] {
+  const formatted = formatPhone(phone);
+  const digits = phoneDigitsOnly(phone).replace(/^241/, "");
+  const variants = new Set<string>();
+
+  if (formatted) variants.add(formatted);
+  if (digits) variants.add(digits);
+  if (digits.length === 8) variants.add(`0${digits}`);
+  if (formatted.startsWith("0") && formatted.length > 1) {
+    variants.add(formatted.slice(1));
+  }
+
+  return [...variants].filter(Boolean);
 }
 
 export function formatDate(date: string): string {

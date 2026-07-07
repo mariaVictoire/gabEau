@@ -25,5 +25,5 @@ export default async function DeliveryDetailPage({
 
   if (!data) notFound();
 
-  return <DeliveryDetail delivery={data as Request} />;
+  return <DeliveryDetail delivery={data as Request} agentId={user.id} />;
 }

@@ -2,13 +2,18 @@
 
 import { requireStaffUser } from "@/actions/auth";
 import { autoAssignRequest, assignRequestToAgent, getAgentAssignmentCounts } from "@/lib/auto-assign";
-import { calculateOrder, calculatePriority, formatPhone } from "@/lib/business-rules";
+import { calculateOrder, calculatePriority, formatPhone, phoneLookupVariants } from "@/lib/business-rules";
 import {
   getServiceClient,
   getSupabaseConfigError,
   SUPABASE_CONFIG_MESSAGE,
 } from "@/lib/supabase/service";
 import { buildDashboardReport, getPeriodRange } from "@/lib/dashboard-report";
+import {
+  allocateRequestNumber,
+  requestNumberLookupVariants,
+  syncRequestCounter,
+} from "@/lib/request-number";
 import type {
   CreateRequestInput,
   DashboardReport,
@@ -30,32 +35,47 @@ async function insertRequest(
     input.quantity
   );
 
-  const { data, error } = await supabase
-    .from("requests")
-    .insert({
-      request_number: "",
-      full_name: input.full_name,
-      phone,
-      district: input.district,
-      address_landmark: input.address_landmark,
-      household_size: 1,
-      situation: "no_water",
-      has_children: false,
-      has_elderly: false,
-      has_sick: false,
-      comment: input.comment || null,
-      product_type: input.product_type,
-      quantity: input.quantity,
-      price_fcfa,
-      estimated_volume_liters,
-      priority,
-      status: "received",
-    })
-    .select()
-    .single();
+  let data: Request | null = null;
+  let lastError: { code?: string; message?: string } | null = null;
 
-  if (error) {
-    console.error("createRequest error:", error);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const request_number = await allocateRequestNumber(supabase);
+    const result = await supabase
+      .from("requests")
+      .insert({
+        request_number,
+        full_name: input.full_name,
+        phone,
+        district: input.district,
+        address_landmark: input.address_landmark,
+        household_size: 1,
+        situation: "no_water",
+        has_children: false,
+        has_elderly: false,
+        has_sick: false,
+        comment: input.comment || null,
+        product_type: input.product_type,
+        quantity: input.quantity,
+        price_fcfa,
+        estimated_volume_liters,
+        priority,
+        status: "received",
+      })
+      .select()
+      .single();
+
+    if (!result.error && result.data) {
+      data = result.data as Request;
+      await syncRequestCounter(supabase, request_number);
+      break;
+    }
+
+    lastError = result.error;
+    if (result.error?.code !== "23505") break;
+  }
+
+  if (!data) {
+    console.error("createRequest error:", lastError);
     return { success: false, error: "Erreur lors de la création de la demande." };
   }
 
@@ -128,12 +148,17 @@ export async function getRequestByNumber(
 ): Promise<Request | null> {
   const supabase = getServiceClient();
   if (!supabase) return null;
-  const { data } = await supabase
-    .from("requests")
-    .select("*")
-    .eq("request_number", requestNumber.toUpperCase())
-    .single();
-  return data as Request | null;
+
+  for (const variant of requestNumberLookupVariants(requestNumber)) {
+    const { data } = await supabase
+      .from("requests")
+      .select("*")
+      .eq("request_number", variant)
+      .maybeSingle();
+    if (data) return data as Request;
+  }
+
+  return null;
 }
 
 export async function trackRequest(
@@ -143,13 +168,18 @@ export async function trackRequest(
   const supabase = getServiceClient();
   if (!supabase) return null;
   const formattedPhone = formatPhone(phone);
-  const { data } = await supabase
-    .from("requests")
-    .select("*")
-    .eq("request_number", requestNumber.toUpperCase())
-    .eq("phone", formattedPhone)
-    .single();
-  return data as Request | null;
+
+  for (const variant of requestNumberLookupVariants(requestNumber)) {
+    const { data } = await supabase
+      .from("requests")
+      .select("*")
+      .eq("request_number", variant)
+      .eq("phone", formattedPhone)
+      .maybeSingle();
+    if (data) return data as Request;
+  }
+
+  return null;
 }
 
 export async function getPreviousRequestByPhone(
@@ -158,20 +188,41 @@ export async function getPreviousRequestByPhone(
   try {
     const supabase = getServiceClient();
     if (!supabase) return null;
-    const formattedPhone = formatPhone(phone);
-    const { data } = await supabase
+
+    const variants = phoneLookupVariants(phone);
+    if (variants.length === 0) return null;
+
+    let data: Request | null = null;
+
+    const { data: exactMatch } = await supabase
       .from("requests")
       .select("*")
-      .eq("phone", formattedPhone)
+      .in("phone", variants)
       .order("created_at", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
+
+    data = exactMatch as Request | null;
+
+    if (!data) {
+      const localDigits = phone.replace(/\D/g, "").replace(/^241/, "").slice(-8);
+      if (localDigits.length === 8) {
+        const { data: fuzzyMatch } = await supabase
+          .from("requests")
+          .select("*")
+          .ilike("phone", `%${localDigits}`)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        data = fuzzyMatch as Request | null;
+      }
+    }
 
     if (!data) return null;
 
     return {
       full_name: data.full_name,
-      phone: data.phone,
+      phone: formatPhone(data.phone),
       district: data.district,
       address_landmark: data.address_landmark,
       product_type: data.product_type,
@@ -190,12 +241,13 @@ export async function searchRequests(
   const formattedQuery = query.trim();
   const formattedPhone = formatPhone(formattedQuery);
 
-  const { data: byNumber } = await supabase
-    .from("requests")
-    .select("*")
-    .eq("request_number", formattedQuery.toUpperCase());
-
-  if (byNumber && byNumber.length > 0) return byNumber as Request[];
+  for (const variant of requestNumberLookupVariants(formattedQuery)) {
+    const { data: byNumber } = await supabase
+      .from("requests")
+      .select("*")
+      .eq("request_number", variant);
+    if (byNumber && byNumber.length > 0) return byNumber as Request[];
+  }
 
   const { data: byPhone } = await supabase
     .from("requests")
@@ -452,51 +504,46 @@ export async function startDelivery(
 ): Promise<{ success: boolean }> {
   const supabase = getServiceClient();
   if (!supabase) return { success: false };
-  await supabase
-    .from("requests")
-    .update({ status: "in_progress" })
-    .eq("id", requestId);
-  await supabase.from("request_events").insert({
-    request_id: requestId,
-    event_type: "delivery_started",
-    new_status: "in_progress",
-    created_by: agentId,
-  });
+  await Promise.all([
+    supabase.from("requests").update({ status: "in_progress" }).eq("id", requestId),
+    supabase.from("request_events").insert({
+      request_id: requestId,
+      event_type: "delivery_started",
+      new_status: "in_progress",
+      created_by: agentId,
+    }),
+  ]);
   return { success: true };
 }
 
 export async function completeDelivery(
   requestId: string,
   agentId: string,
-  personMetName: string,
-  comment?: string,
-  photoUrl?: string
+  personMetName?: string
 ): Promise<{ success: boolean }> {
   const supabase = getServiceClient();
   if (!supabase) return { success: false };
   const now = new Date().toISOString();
+  const recipient = personMetName?.trim() || "Client";
 
-  await supabase.from("delivery_proofs").insert({
-    request_id: requestId,
-    agent_id: agentId,
-    person_met_name: personMetName,
-    comment: comment || null,
-    photo_url: photoUrl || null,
-    delivered_at: now,
-  });
-
-  await supabase
-    .from("requests")
-    .update({ status: "delivered", delivered_at: now })
-    .eq("id", requestId);
-
-  await supabase.from("request_events").insert({
-    request_id: requestId,
-    event_type: "delivery_completed",
-    new_status: "delivered",
-    comment: `Livré à ${personMetName}`,
-    created_by: agentId,
-  });
+  await Promise.all([
+    supabase.from("delivery_proofs").insert({
+      request_id: requestId,
+      agent_id: agentId,
+      person_met_name: recipient,
+      comment: null,
+      photo_url: null,
+      delivered_at: now,
+    }),
+    supabase.from("requests").update({ status: "delivered", delivered_at: now }).eq("id", requestId),
+    supabase.from("request_events").insert({
+      request_id: requestId,
+      event_type: "delivery_completed",
+      new_status: "delivered",
+      comment: "Livraison confirmée",
+      created_by: agentId,
+    }),
+  ]);
 
   return { success: true };
 }
@@ -508,17 +555,16 @@ export async function failDelivery(
 ): Promise<{ success: boolean }> {
   const supabase = getServiceClient();
   if (!supabase) return { success: false };
-  await supabase
-    .from("requests")
-    .update({ status: "failed_delivery" })
-    .eq("id", requestId);
-  await supabase.from("request_events").insert({
-    request_id: requestId,
-    event_type: "delivery_failed",
-    new_status: "failed_delivery",
-    comment: comment || "Échec de livraison",
-    created_by: agentId,
-  });
+  await Promise.all([
+    supabase.from("requests").update({ status: "failed_delivery" }).eq("id", requestId),
+    supabase.from("request_events").insert({
+      request_id: requestId,
+      event_type: "delivery_failed",
+      new_status: "failed_delivery",
+      comment: comment || "Échec de livraison",
+      created_by: agentId,
+    }),
+  ]);
   return { success: true };
 }
 

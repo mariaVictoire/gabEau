@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { startDelivery, completeDelivery, failDelivery } from "@/actions/requests";
+import { SignaturePad, type SignaturePadHandle } from "@/components/SignaturePad";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Textarea } from "@/components/ui/Textarea";
@@ -18,6 +19,8 @@ export function DeliveryDetail({
   agentId: string;
 }) {
   const router = useRouter();
+  const signatureRef = useRef<SignaturePadHandle>(null);
+  const [showComplete, setShowComplete] = useState(false);
   const [showFail, setShowFail] = useState(false);
   const [failComment, setFailComment] = useState("");
   const [message, setMessage] = useState("");
@@ -32,8 +35,24 @@ export function DeliveryDetail({
   }
 
   function handleComplete() {
+    if (signatureRef.current?.isEmpty()) {
+      setMessage("Demandez au bénéficiaire de signer avant de valider.");
+      return;
+    }
+
+    const signatureDataUrl = signatureRef.current?.toDataURL() ?? "";
+    setMessage("");
     startTransition(async () => {
-      await completeDelivery(delivery.id, agentId, delivery.full_name);
+      const result = await completeDelivery(
+        delivery.id,
+        agentId,
+        delivery.full_name,
+        signatureDataUrl
+      );
+      if (!result.success) {
+        setMessage(result.error ?? "Erreur lors de la validation.");
+        return;
+      }
       router.push("/agent/deliveries");
     });
   }
@@ -46,7 +65,7 @@ export function DeliveryDetail({
   }
 
   const isActive = ["assigned", "in_progress"].includes(delivery.status);
-  const showStickyActions = isActive && !showFail;
+  const showStickyActions = isActive && !showFail && !showComplete;
   const order = getOrderDisplay(delivery);
 
   return (
@@ -69,7 +88,7 @@ export function DeliveryDetail({
 
           <a
             href={`tel:${delivery.phone}`}
-            className="flex items-center justify-between rounded-xl bg-blue-600 text-white px-4 py-4 min-h-[56px] active:bg-blue-700 transition-colors"
+            className="flex items-center justify-between rounded-xl bg-blue-600 text-white px-4 py-4 min-h-[44px] active:bg-blue-700 transition-colors"
           >
             <span className="text-sm font-medium opacity-80">Appeler</span>
             <span className="text-lg font-bold">{delivery.phone}</span>
@@ -98,9 +117,39 @@ export function DeliveryDetail({
       </Card>
 
       {message && (
-        <div className="rounded-xl bg-green-50 border border-green-100 p-3 text-sm text-green-700">
+        <div
+          className={`rounded-xl border p-3 text-sm ${
+            message.includes("Erreur") || message.includes("Demandez")
+              ? "bg-amber-50 border-amber-100 text-amber-800"
+              : "bg-green-50 border-green-100 text-green-700"
+          }`}
+        >
           {message}
         </div>
+      )}
+
+      {showComplete && (
+        <Card>
+          <h2 className="font-bold mb-1 text-slate-900">Signature du bénéficiaire</h2>
+          <p className="text-sm text-slate-500 mb-4">{delivery.full_name}</p>
+          <SignaturePad ref={signatureRef} />
+          <div className="flex flex-col gap-3 mt-4">
+            <Button variant="success" size="lg" onClick={handleComplete} loading={isPending}>
+              Confirmer la livraison
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() => {
+                setShowComplete(false);
+                setMessage("");
+              }}
+              disabled={isPending}
+            >
+              Annuler
+            </Button>
+          </div>
+        </Card>
       )}
 
       {showFail && (
@@ -139,8 +188,10 @@ export function DeliveryDetail({
                   size="lg"
                   variant="success"
                   className="w-full"
-                  onClick={handleComplete}
-                  loading={isPending}
+                  onClick={() => {
+                    setShowComplete(true);
+                    setMessage("");
+                  }}
                 >
                   Marquer comme livrée
                 </Button>

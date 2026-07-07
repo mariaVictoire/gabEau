@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { LandingTopBar } from "@/components/layout/LandingTopBar";
 import { Logo } from "@/components/ui/Logo";
-import { HomeLink } from "@/components/ui/HomeLink";
 import { Button } from "@/components/ui/Button";
 
 const features = [
@@ -62,9 +62,9 @@ const features = [
 export default function AdminLandingPage() {
   return (
     <div className="min-h-screen flex flex-col safe-x bg-gabon-blue-light/30">
-      <div className="gabon-tricolor" aria-hidden />
+      <LandingTopBar backHref="/connexion" backLabel="Accès personnel" />
 
-      <header className="relative overflow-hidden bg-gradient-to-br from-gabon-blue via-gabon-blue-dark to-gabon-green px-4 pt-10 pb-14 safe-top">
+      <header className="relative overflow-hidden bg-gradient-to-br from-gabon-blue via-gabon-blue-dark to-gabon-green px-4 pt-6 pb-14">
         <div className="pointer-events-none absolute -right-12 -top-12 h-48 w-48 rounded-full bg-gabon-yellow/20 blur-3xl" aria-hidden />
         <div className="relative mx-auto max-w-lg text-center">
           <Link href="/" className="inline-flex justify-center mb-6">
@@ -99,13 +99,6 @@ export default function AdminLandingPage() {
             Se connecter
           </Button>
         </Link>
-
-        <p className="mt-6 text-center flex flex-col items-center gap-2 text-sm">
-          <Link href="/connexion" className="font-semibold text-gabon-blue hover:underline">
-            ← Accès personnel
-          </Link>
-          <HomeLink className="justify-center" />
-        </p>
       </main>
 
       <footer className="border-t border-gabon-blue/10 bg-white py-4 text-center safe-bottom">

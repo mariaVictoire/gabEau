@@ -519,10 +519,21 @@ export async function startDelivery(
 export async function completeDelivery(
   requestId: string,
   agentId: string,
-  personMetName?: string
-): Promise<{ success: boolean }> {
+  personMetName?: string,
+  signatureDataUrl?: string
+): Promise<{ success: boolean; error?: string }> {
   const supabase = getServiceClient();
-  if (!supabase) return { success: false };
+  if (!supabase) return { success: false, error: "Service indisponible." };
+
+  if (!signatureDataUrl?.startsWith("data:image/png;base64,")) {
+    return { success: false, error: "Signature requise." };
+  }
+
+  const signatureUrl = await uploadDeliverySignature(signatureDataUrl, requestId);
+  if (!signatureUrl) {
+    return { success: false, error: "Impossible d'enregistrer la signature." };
+  }
+
   const now = new Date().toISOString();
   const recipient = personMetName?.trim() || "Client";
 
@@ -533,6 +544,7 @@ export async function completeDelivery(
       person_met_name: recipient,
       comment: null,
       photo_url: null,
+      signature_url: signatureUrl,
       delivered_at: now,
     }),
     supabase.from("requests").update({ status: "delivered", delivered_at: now }).eq("id", requestId),
@@ -540,7 +552,7 @@ export async function completeDelivery(
       request_id: requestId,
       event_type: "delivery_completed",
       new_status: "delivered",
-      comment: "Livraison confirmée",
+      comment: "Livraison confirmée avec signature",
       created_by: agentId,
     }),
   ]);
@@ -566,6 +578,30 @@ export async function failDelivery(
     }),
   ]);
   return { success: true };
+}
+
+export async function uploadDeliverySignature(
+  dataUrl: string,
+  requestId: string
+): Promise<string | null> {
+  const supabase = getServiceClient();
+  if (!supabase) return null;
+
+  const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
+  const buffer = Buffer.from(base64, "base64");
+  const path = `${requestId}/signature-${Date.now()}.png`;
+
+  const { error } = await supabase.storage
+    .from("delivery-proofs")
+    .upload(path, buffer, { contentType: "image/png", upsert: false });
+
+  if (error) {
+    console.error("Signature upload error:", error);
+    return null;
+  }
+
+  const { data } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function uploadDeliveryPhoto(

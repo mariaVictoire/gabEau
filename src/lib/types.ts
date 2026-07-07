@@ -86,6 +86,7 @@ export interface DeliveryProof {
   person_met_name: string;
   comment: string | null;
   photo_url: string | null;
+  signature_url: string | null;
   delivered_at: string;
   agent?: User | null;
 }

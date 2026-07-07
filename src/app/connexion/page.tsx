@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { LandingTopBar } from "@/components/layout/LandingTopBar";
 import { Logo } from "@/components/ui/Logo";
-import { HomeLink } from "@/components/ui/HomeLink";
 
 const staffOptions = [
   {
@@ -22,9 +22,9 @@ const staffOptions = [
 export default function ConnexionPage() {
   return (
     <div className="min-h-screen flex flex-col safe-x bg-slate-50">
-      <div className="gabon-tricolor" aria-hidden />
+      <LandingTopBar />
 
-      <header className="bg-gradient-to-br from-slate-700 via-slate-800 to-gabon-green-dark px-4 pt-10 pb-12 safe-top text-center">
+      <header className="bg-gradient-to-br from-slate-700 via-slate-800 to-gabon-green-dark px-4 pt-6 pb-12 text-center">
         <Link href="/" className="inline-flex justify-center mb-5">
           <Logo size="lg" light />
         </Link>
@@ -68,10 +68,6 @@ export default function ConnexionPage() {
             </Link>
           ))}
         </div>
-
-        <p className="mt-8 text-center">
-          <HomeLink className="justify-center" />
-        </p>
       </main>
 
       <footer className="border-t border-slate-200 bg-white py-4 text-center safe-bottom">

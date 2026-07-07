@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { LandingTopBar } from "@/components/layout/LandingTopBar";
 import { Logo } from "@/components/ui/Logo";
-import { HomeLink } from "@/components/ui/HomeLink";
 import { Button } from "@/components/ui/Button";
 
 const features = [
@@ -17,7 +17,7 @@ const features = [
   },
   {
     title: "Confirmation livraison",
-    description: "Photo et signature du bénéficiaire",
+    description: "Signature du bénéficiaire",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-5 w-5">
         <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -40,9 +40,9 @@ const features = [
 export default function AgentLandingPage() {
   return (
     <div className="min-h-screen flex flex-col safe-x bg-gabon-yellow-light/40">
-      <div className="gabon-tricolor" aria-hidden />
+      <LandingTopBar backHref="/connexion" backLabel="Accès personnel" />
 
-      <header className="relative overflow-hidden bg-gradient-to-br from-gabon-green via-gabon-green-dark to-gabon-yellow px-4 pt-10 pb-14 safe-top">
+      <header className="relative overflow-hidden bg-gradient-to-br from-gabon-green via-gabon-green-dark to-gabon-yellow px-4 pt-6 pb-14">
         <div className="pointer-events-none absolute -left-12 top-8 h-40 w-40 rounded-full bg-white/15 blur-3xl" aria-hidden />
         <div className="relative mx-auto max-w-lg text-center">
           <Link href="/" className="inline-flex justify-center mb-6">
@@ -77,13 +77,6 @@ export default function AgentLandingPage() {
             Se connecter
           </Button>
         </Link>
-
-        <p className="mt-6 text-center flex flex-col items-center gap-2 text-sm">
-          <Link href="/connexion" className="font-semibold text-gabon-green hover:underline">
-            ← Accès personnel
-          </Link>
-          <HomeLink className="justify-center" />
-        </p>
       </main>
 
       <footer className="border-t border-gabon-green/10 bg-white py-4 text-center safe-bottom">

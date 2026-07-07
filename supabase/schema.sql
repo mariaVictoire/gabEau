@@ -93,6 +93,7 @@ CREATE TABLE delivery_proofs (
   person_met_name TEXT NOT NULL,
   comment TEXT,
   photo_url TEXT,
+  signature_url TEXT,
   delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -529,24 +529,40 @@ export async function completeDelivery(
     return { success: false, error: "Signature requise." };
   }
 
-  const signatureUrl = await uploadDeliverySignature(signatureDataUrl, requestId);
-  if (!signatureUrl) {
-    return { success: false, error: "Impossible d'enregistrer la signature." };
+  const signature = await uploadDeliverySignature(signatureDataUrl, requestId);
+  if (!signature.url) {
+    return {
+      success: false,
+      error: signature.error ?? "Impossible d'enregistrer la signature.",
+    };
   }
 
   const now = new Date().toISOString();
   const recipient = personMetName?.trim() || "Client";
 
+  const { error: proofError } = await supabase.from("delivery_proofs").insert({
+    request_id: requestId,
+    agent_id: agentId,
+    person_met_name: recipient,
+    comment: null,
+    photo_url: null,
+    signature_url: signature.url,
+    delivered_at: now,
+  });
+
+  if (proofError) {
+    console.error("delivery_proofs insert error:", proofError);
+    if (proofError.message.includes("signature_url")) {
+      return {
+        success: false,
+        error:
+          "Colonne signature_url manquante. Exécutez supabase/migration_delivery_signature.sql dans Supabase.",
+      };
+    }
+    return { success: false, error: "Impossible d'enregistrer la preuve de livraison." };
+  }
+
   await Promise.all([
-    supabase.from("delivery_proofs").insert({
-      request_id: requestId,
-      agent_id: agentId,
-      person_met_name: recipient,
-      comment: null,
-      photo_url: null,
-      signature_url: signatureUrl,
-      delivered_at: now,
-    }),
     supabase.from("requests").update({ status: "delivered", delivered_at: now }).eq("id", requestId),
     supabase.from("request_events").insert({
       request_id: requestId,
@@ -583,25 +599,41 @@ export async function failDelivery(
 export async function uploadDeliverySignature(
   dataUrl: string,
   requestId: string
-): Promise<string | null> {
+): Promise<{ url: string | null; error?: string }> {
   const supabase = getServiceClient();
-  if (!supabase) return null;
+  if (!supabase) {
+    return { url: null, error: "Supabase non configuré." };
+  }
 
   const base64 = dataUrl.replace(/^data:image\/png;base64,/, "");
-  const buffer = Buffer.from(base64, "base64");
+  if (!base64) {
+    return { url: null, error: "Signature vide." };
+  }
+
+  const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
   const path = `${requestId}/signature-${Date.now()}.png`;
 
   const { error } = await supabase.storage
     .from("delivery-proofs")
-    .upload(path, buffer, { contentType: "image/png", upsert: false });
+    .upload(path, bytes, { contentType: "image/png", upsert: true });
 
   if (error) {
     console.error("Signature upload error:", error);
-    return null;
+    const sizeBytes = bytes.byteLength;
+    if (sizeBytes > 0 && sizeBytes <= 200_000) {
+      return { url: dataUrl };
+    }
+    return {
+      url: null,
+      error:
+        error.message.includes("Bucket not found") || error.message.includes("not found")
+          ? "Bucket Storage « delivery-proofs » manquant. Exécutez supabase/migration_storage_delivery_proofs.sql."
+          : `Upload Storage : ${error.message}`,
+    };
   }
 
   const { data } = supabase.storage.from("delivery-proofs").getPublicUrl(path);
-  return data.publicUrl;
+  return { url: data.publicUrl };
 }
 
 export async function uploadDeliveryPhoto(
